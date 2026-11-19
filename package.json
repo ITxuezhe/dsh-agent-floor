@@ -4,21 +4,47 @@
   "description": "Agent Floor — a lightweight god's-eye dock for DeepSeek Harness: one pixel engineer per live session, with status, step, tool and token progress.",
   "license": "MIT",
   "type": "module",
-  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "agents", "dashboard", "observability"],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agents",
+    "dashboard",
+    "observability"
+  ],
   "homepage": "https://github.com/ITxuezhe/dsh-agent-floor",
-  "repository": { "type": "git", "url": "https://github.com/ITxuezhe/dsh-agent-floor.git" },
-  "engines": { "dsh": "^0.2.0" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ITxuezhe/dsh-agent-floor.git"
+  },
+  "engines": {
+    "dsh": "^0.2.0"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js"
   },
-  "files": ["index.js", "client.js", "cordis.patch.yml", "icon.svg", "README.md", "scripts"],
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "scripts/harness.js",
+    "scripts/render.js",
+    "scripts/raster.py",
+    "scripts/README.md"
+  ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-slots"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
     }
   }
 }

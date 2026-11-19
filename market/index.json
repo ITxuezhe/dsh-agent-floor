@@ -36,11 +36,9 @@
       "versions": [
         {
           "version": "0.1.0",
-          "publishTimestamp": 1795077183,
+          "publishTimestamp": 1795080318,
           "source": {
-            "type": "git",
-            "url": "https://github.com/ITxuezhe/dsh-agent-floor",
-            "commit": "80c70a026abc981d6130750d6aa48c0c851400fc"
+            "type": "npm"
           },
           "engines": {
             "dsh": "^0.2.0"
