@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Agent Floor",
+    "zh": "Agent Floor · 工位视图"
+  },
+  "description": {
+    "en": "A god's-eye floor for DeepSeek Harness: every session as a pixel engineer with live progress.",
+    "zh": "DeepSeek Harness 的上帝视角工位视图：每个会话一位像素工程师，实时显示进度。"
+  },
+  "plugins": [
+    {
+      "name": "dsh-agent-floor",
+      "title": {
+        "en": "Agent Floor",
+        "zh": "Agent Floor · 工位视图"
+      },
+      "description": {
+        "en": "Watch every session and subagent as pixel engineers sitting in an isometric floor. Zoom, pan, click a nameplate to jump to that session. Theme-aware, read-only, no config.",
+        "zh": "把每个会话与子代理变成坐在等距工位房间里的像素工程师：可缩放、可拖动、点名牌跳会话。跟随深浅色皮肤，只读，免配置。"
+      },
+      "icon": "../icon.svg",
+      "author": "ITxuezhe",
+      "homepage": "https://github.com/ITxuezhe/dsh-agent-floor",
+      "repository": {
+        "url": "https://github.com/ITxuezhe/dsh-agent-floor"
+      },
+      "metadata": {
+        "keywords": [
+          "agents",
+          "dashboard",
+          "observability",
+          "isometric"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1795077183,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/ITxuezhe/dsh-agent-floor",
+            "commit": "b5882f85e1032c5b777b390427fa0d0d33a12491"
+          },
+          "engines": {
+            "dsh": "^0.2.0"
+          }
+        }
+      ]
+    }
+  ]
+}

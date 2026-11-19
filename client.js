@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/dsh-agent-floor',
+  id: 'dsh-agent-floor',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
