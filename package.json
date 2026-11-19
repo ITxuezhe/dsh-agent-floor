@@ -1,0 +1,24 @@
+{
+  "name": "dsh-agent-floor",
+  "version": "0.1.0",
+  "description": "Agent Floor — a lightweight god's-eye dock for DeepSeek Harness: one pixel engineer per live session, with status, step, tool and token progress.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "agents", "dashboard", "observability"],
+  "homepage": "https://github.com/ITxuezhe/dsh-agent-floor",
+  "repository": { "type": "git", "url": "https://github.com/ITxuezhe/dsh-agent-floor.git" },
+  "engines": { "dsh": "^0.2.0" },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "files": ["index.js", "client.js", "cordis.patch.yml", "icon.svg", "README.md", "scripts"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-slots"]
+    }
+  }
+}
