@@ -1,65 +1,46 @@
-# Agent Floor · 工位视图
+# Agent Floor · 常驻监控条
 
-给 DeepSeek Harness 加一个「上帝视角」浮层：**每个会话就是一位像素工程师**，坐在等距工位房间里，
-名牌上实时显示状态、第几步、第几轮、多少次工具、改了哪些文件；点名牌直接跳到那个会话。
+给 DeepSeek Harness 左下角挂一条**常驻监控条**：不用开标签页，随时能瞄一眼哪个会话在跑、跑到第几步、烧了多少 token、改了哪些文件。
 
-- 左下角胶囊：`工位 N 人 · M 在干活`
-- 点开是值班名单（主工程师 / 组长带队 N 人 / 子工程师）
-- `⛶` 进等距工位房间：滚轮缩放（0.6–2.2）、按住拖动、双击复位
-- 子代理会从工位走向组长的工位（虚线 + 动画），表示"在传话"
+DSH 自带的「任务管理」页已经能看到 agent 树和后台任务，但它是**按会话打开的标签页**，而且没有步/轮/token/改动文件这些指标。这个插件只补这块，不重复画树。
 
-## 安装
+## 长什么样
 
-### 从插件市场（推荐）
+- **收起**：`● 2 在跑 / 5 在岗`（有会话在跑时圆点呼吸）
+- **点开**：每个会话一行 —— 状态点、名字（组长带 `带队 N`）、`第N步·第T轮 · 12.3k tok`、正在跑的 `bash · pnpm run build` 或 `改 client.js · index.js`
+- 点任意一行 → 跳到那个会话
 
-1. 设置 → 插件市场 → 索引源，添加：
-   `https://raw.githubusercontent.com/ITxuezhe/dsh-agent-floor/main/market/index.json`
-2. 在发现页找到 **Agent Floor**，点安装，然后刷新页面（⌘⇧R）。
-
-### 手动安装
+## 装
 
 ```bash
-dsh plugin install dsh-agent-floor            # npm
-# 或从源码目录
-dsh plugin install file:/path/to/dsh-agent-floor
+dsh plugin install dsh-agent-floor          # npm，0.2.0+
 ```
 
-装完切一次插件开关（关掉再打开），再 ⌘⇧R 刷新页面。
+或加市场索引源：`https://raw.githubusercontent.com/ITxuezhe/dsh-agent-floor/main/market/index.json`
+
+装完刷新页面（⌘⇧R）。
 
 ## 数据从哪来
 
-插件挂的是官方插槽 `shell.overlay`，客户端每 1.8 秒（面板收起时 7 秒）拉一次只读路由
-`GET /dsh-agent-floor/state`；Host 半监听会话事件折叠成快照：
+插件挂官方插槽 `shell.overlay`，客户端每 2 秒（收起时 6 秒）拉一次只读路由 `GET /dsh-agent-floor/state`。
+Host 半监听会话事件折叠成快照，并按会话 cwd 跑 `git status --porcelain`（10 秒缓存、失败降级为空）拿真实改动文件。
 
-- `status`：会话在跑，或 45 秒内有动静 → RUNNING；5 分钟内 → STANDBY；否则 IDLE
-- `diffFiles`：按会话 cwd 跑 `git status --porcelain`（10 秒缓存，非 git 仓库返回空）
-- 子代理靠 `parentSession` 归到组长名下；空闲超过 10 分钟的子工程师自动淡出
+- 状态：`running` 或 45 秒内有动静 → RUNNING；5 分钟内 → STANDBY；否则 IDLE
+- 子代理靠 `parentSession` 归到组长名下，空闲超过 10 分钟自动淡出
+- 展开/收起状态存在 localStorage `dsh.agent-floor.open`
 
-## 自检工具
-
-界面改动可以脱离 DSH 自检：`scripts/` 下有 `harness.js`（加载 `client.js`、走一遍 `apply()` 并真实渲染 `FloorDock` 与 `IsoFloor`）、
-`render.js`（假数据渲染成 `scripts/out/iso.svg`）和 `raster.py`（SVG → PNG，Pillow）。
+## 自检
 
 ```bash
-node scripts/harness.js      # 渲染自检，成功打印 render ok，exit 0
-node scripts/render.js       # 生成 scripts/out/iso.svg（浅色皮肤快照）
-python3 scripts/raster.py    # 生成 scripts/out/iso.png，肉眼确认布局
+node scripts/harness.js     # 桩宿主环境、真渲染一次，成功打印 render ok
 ```
 
 详见 [scripts/README.md](scripts/README.md)。
 
 ## 皮肤与重载
 
-- **深色 / 浅色皮肤都自适应**：所有颜色都来自 `--dsw-*` 主题 token（`var(--dsw-alias-*, fallback)`），
-  不写死任何一套配色；切换 DSH 的深浅色皮肤时组件会自动跟随。
-- **插件热重载**：改完 `client.js` / `index.js` 后不用重启 DSH，到插件设置里把 Agent Floor
-  开关切一次（关掉再打开）即可加载新代码。
-
-## 局限
-
-- 只有从 Git 提交安装的副本能"一键更新"；本地目录安装的副本需要卸载重装。
-- 面板是只读观察器：不能从面板里派活或打断会话。
-- 非 git 工作区看不到真实改动文件，只能显示工具调用推断出的文件名。
+- 颜色全部来自 `--dsw-*` 主题 token，深浅色皮肤自动跟随。
+- 改完代码到插件设置里把开关切一次即可热重载，不用重启 DSH。
 
 ## License
 

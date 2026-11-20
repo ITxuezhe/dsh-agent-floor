@@ -3,8 +3,8 @@
  * harness.js — 无需 DSH / 浏览器的客户端自检。
  *
  * 桩掉 window.__ModuleLoader__、React、document 等宿主环境，真的加载 ../client.js，
- * 走一遍 apply() 的注册链路，然后把注册出来的组件（FloorDock）和场景组件（IsoFloor）
- * 各渲染一次。任何一步抛错都以 exit 1 结束并打印堆栈。
+ * 走一遍 apply() 的注册链路，然后把注册出来的监控条（MonitorBar）真渲染一次，
+ * 再用假会话验证 deriveAgents 的分组与排序。任何一步抛错都以 exit 1 结束并打印堆栈。
  *
  * 用法：
  *   node scripts/harness.js                 # 默认检查 ../client.js
@@ -104,8 +104,9 @@ function findTag(nodes, tag) {
 // 宿主环境桩
 // ---------------------------------------------------------------------------
 function createStubs() {
+  const store = { 'dsh.agent-floor.open': '1' };
   const storage = {
-    getItem: () => null,
+    getItem: (k) => (k in store ? store[k] : null),
     setItem: () => {},
     removeItem: () => {},
   };
@@ -146,12 +147,14 @@ function main() {
   let src = fs.readFileSync(target, 'utf8');
 
   // 只在内存里改写导出语句，把内部组件暴露给自检；不落盘。
-  const EXPORT_RE = /return\s*\{\s*inject\s*,\s*apply\s*\};/;
-  if (!EXPORT_RE.test(src)) {
-    throw new Error('client.js: 找不到 `return { inject, apply };` —— 导出结构变了？请同步更新 scripts/harness.js / render.js 的 EXPORT_RE。');
+  if (src.indexOf('__dshTest') < 0) {
+    const EXPORT_RE = /return\s*\{\s*inject\s*,\s*apply\s*\};/;
+    if (!EXPORT_RE.test(src)) {
+      throw new Error('client.js: 既没有 __dshTest，也找不到 `return { inject, apply };` —— 导出结构变了？');
+    }
+    src = src.replace(EXPORT_RE,
+      'return { inject, apply, __dshTest: { deriveAgents: deriveAgents, MonitorBar: MonitorBar } };');
   }
-  src = src.replace(EXPORT_RE,
-    'return { inject, apply, __dshTest: { IsoFloor: IsoFloor, deriveAgents: deriveAgents, FloorDock: FloorDock } };');
 
   const factoryFn = new Function(
     'window', 'document', 'localStorage', 'fetch', 'console', '__filename', '__dirname', src,
@@ -199,8 +202,8 @@ function main() {
 
   // 3) 用 5 个假 agent 渲染 IsoFloor（满屏场景），确保场景层也能画出来。
   const test = mod.__dshTest;
-  if (!test || typeof test.IsoFloor !== 'function' || typeof test.deriveAgents !== 'function') {
-    throw new Error('client.js 没有暴露 __dshTest（导出语句可能又被改了）');
+  if (!test || typeof test.MonitorBar !== 'function' || typeof test.deriveAgents !== 'function') {
+    throw new Error('client.js 没有暴露 __dshTest.MonitorBar / deriveAgents');
   }
   const now = Date.now();
   const sessions = [
@@ -214,12 +217,22 @@ function main() {
   if (ordered.length !== 5) throw new Error('deriveAgents 期望 5 个 agent，实际 ' + ordered.length);
   if (ordered.filter((o) => o.depth === 1).length !== 1) throw new Error('deriveAgents 没把子代理排成 depth 1');
 
-  const COLS = 4;
-  const seats = ordered.map((o, i) => ({ agent: o.agent, row: Math.floor(i / COLS), col: i % COLS }));
-  const isoTree = renderNode(React.createElement(test.IsoFloor, { seats, onOpen: () => {} }));
-  if (!isoTree.length || isoTree[0].tag !== 'svg') throw new Error('IsoFloor 顶层不是 svg');
-  const isoNodes = countNodes(isoTree);
-  if (isoNodes < 40) throw new Error('IsoFloor 只渲染出 ' + isoNodes + ' 个节点，像是空场景');
+  const bar = renderNode(React.createElement(test.MonitorBar, { ctx: ctx }));
+  if (!bar.length || bar[0].tag !== 'div') throw new Error('MonitorBar 顶层不是 div');
+  const barNodes = countNodes(bar);
+  const expanded = renderNode(React.createElement(test.MonitorBar, { ctx: ctx, initialData: { sessions } }));
+  let rowCount = 0;
+  (function walk3(n) {
+    if (!n || typeof n !== 'object') return;
+    const cls = n.props && n.props.className;
+    if (typeof cls === 'string' && cls.indexOf('fg-row') === 0) rowCount++;
+    for (const c of n.children || []) walk3(c);
+  })(expanded[0]);
+  if (rowCount !== 5) throw new Error('展开状态应渲染 5 行，实际 ' + rowCount);
+
+  const row = renderNode(React.createElement(test.MonitorRow, { agent: ordered[0], onOpen: () => {} }));
+  if (!row.length || row[0].tag !== 'div') throw new Error('MonitorRow 顶层不是 div');
+  if (String(row[0].props.className).indexOf('fg-row') !== 0) throw new Error('MonitorRow 缺少 fg-row className');
 
   // 4) 跑一次 effect（useFloor 会发起一次假 fetch），确认轮询逻辑不炸。
   for (const fn of effects) {
@@ -229,7 +242,7 @@ function main() {
 
   console.log('  client : ' + target);
   console.log('  dock   : <' + rootTag + ' class="' + tree[0].props.className + '"> (' + dockNodes + ' nodes)');
-  console.log('  iso    : <svg> (' + isoNodes + ' nodes, ' + ordered.length + ' agents)');
+  console.log('  bar    : <div fg-root> (' + barNodes + ' nodes, ' + ordered.length + ' agents)');
   console.log('  effects: ' + effects.length + ' 个已执行');
   console.log('render ok');
 }

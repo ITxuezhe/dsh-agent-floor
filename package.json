@@ -1,7 +1,7 @@
 {
   "name": "dsh-agent-floor",
-  "version": "0.1.0",
-  "description": "Agent Floor — a lightweight god's-eye dock for DeepSeek Harness: one pixel engineer per live session, with status, step, tool and token progress.",
+  "version": "0.2.0",
+  "description": "Agent Floor — a compact always-on dock for DeepSeek Harness: which session is running, how far along, how many tokens, which files changed.",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -31,8 +31,6 @@
     "icon.svg",
     "README.md",
     "scripts/harness.js",
-    "scripts/render.js",
-    "scripts/raster.py",
     "scripts/README.md"
   ],
   "dsh": {
