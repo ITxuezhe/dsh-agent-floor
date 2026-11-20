@@ -8,19 +8,22 @@ window.__ModuleLoader__.load({
     const inject = ['slots'];
     const ROUTE = '/dsh-agent-floor/state';
     const OPEN_KEY = 'dsh.agent-floor.open';
+    const POS_KEY = 'dsh.agent-floor.pos';
     const CHILD_TTL = 10 * 60 * 1000;
     const MAX_ROWS = 8;
 
     const CSS = `
-.fg-root{position:fixed;left:14px;bottom:14px;z-index:60;pointer-events:auto;
+.fg-root{position:fixed;inset:0;z-index:60;pointer-events:none;
   font:12px/1.5 ui-sans-serif,-apple-system,"SF Pro Text","PingFang SC",system-ui,sans-serif;
   color:var(--dsw-alias-label-primary,#1c1c1e);}
-.fg-dock{min-width:196px;max-width:340px;border-radius:12px;overflow:hidden;
+.fg-dock{position:absolute;min-width:196px;max-width:340px;border-radius:12px;overflow:hidden;
+  pointer-events:auto;
   background:var(--dsw-alias-bg-overlay,#fff);
   border:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.09));
   box-shadow:0 8px 28px rgba(0,0,0,.12);}
-.fg-head{display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:pointer;
-  user-select:none;-webkit-user-select:none;}
+.fg-head{display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:grab;
+  user-select:none;-webkit-user-select:none;touch-action:none;}
+.fg-head.dragging{cursor:grabbing;}
 .fg-head:hover{background:var(--dsw-alias-bg-layer-2,rgba(0,0,0,.03));}
 .fg-pulse{width:7px;height:7px;border-radius:50%;flex:0 0 auto;
   background:var(--dsw-alias-state-idle-primary,#9aa0a6);}
@@ -167,11 +170,26 @@ window.__ModuleLoader__.load({
       ]);
     }
 
+    function readPos() {
+      try {
+        const raw = localStorage.getItem(POS_KEY);
+        if (raw) {
+          const v = JSON.parse(raw);
+          if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) return { x: v.x, y: v.y };
+        }
+      } catch {}
+      return { x: 14, y: 14 };
+    }
+
     function MonitorBar(props) {
       const ctx = (props && props.ctx) || null;
       const [open, setOpen] = useState(() => {
         try { return localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
       });
+      const [pos, setPos] = useState(readPos);
+      const [dragging, setDragging] = useState(false);
+      const dragRef = useRef(null);
+      const movedRef = useRef(false);
       const data = useFloor(open, props && props.initialData);
       const agents = deriveAgents(data);
       const running = agents.filter((a) => a.status === 'RUNNING').length;
@@ -186,6 +204,51 @@ window.__ModuleLoader__.load({
 
       useEffect(() => { ensureStyle(); }, []);
 
+      useEffect(() => {
+        if (!dragging) return undefined;
+        const move = (e) => {
+          const d = dragRef.current;
+          if (!d) return;
+          const dx = e.clientX - d.x0;
+          const dy = e.clientY - d.y0;
+          if (Math.abs(dx) + Math.abs(dy) > 3) movedRef.current = true;
+          const maxX = Math.max(8, (window.innerWidth || 1200) - 120);
+          const maxY = Math.max(8, (window.innerHeight || 800) - 60);
+          setPos({
+            x: Math.min(maxX, Math.max(8, d.px + dx)),
+            y: Math.min(maxY, Math.max(8, d.py - dy)),
+          });
+        };
+        const up = () => {
+          setDragging(false);
+          const p = readPos();
+          try { localStorage.setItem(POS_KEY, JSON.stringify(snapRef.current || p)); } catch {}
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+        return () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
+        };
+      }, [dragging]);
+
+      const snapRef = useRef(pos);
+      snapRef.current = pos;
+
+      const onHeadDown = (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        dragRef.current = { x0: e.clientX, y0: e.clientY, px: pos.x, py: pos.y };
+        movedRef.current = false;
+        setDragging(true);
+      };
+
+      const onHeadClick = () => {
+        if (movedRef.current) { movedRef.current = false; return; }
+        toggle();
+      };
+
       const openSession = (a) => {
         const id = a && a.id;
         if (!id) return;
@@ -197,8 +260,17 @@ window.__ModuleLoader__.load({
         } catch {}
       };
 
-      return h('div', { className: 'fg-root' }, h('div', { className: 'fg-dock' }, [
-        h('div', { className: 'fg-head', key: 'head', onClick: toggle, title: open ? '收起监控条' : '展开监控条' }, [
+      return h('div', { className: 'fg-root' }, h('div', {
+        className: 'fg-dock',
+        style: { left: pos.x + 'px', bottom: pos.y + 'px' },
+      }, [
+        h('div', {
+          className: 'fg-head' + (dragging ? ' dragging' : ''),
+          key: 'head',
+          onPointerDown: onHeadDown,
+          onClick: onHeadClick,
+          title: '拖动可移动位置 · 点击' + (open ? '收起' : '展开'),
+        }, [
           h('span', { className: 'fg-pulse' + (running ? ' on' : ''), key: 'p' }),
           h('span', { className: 'fg-sum', key: 's' }, [
             running ? running + ' 在跑' : '全部空闲',

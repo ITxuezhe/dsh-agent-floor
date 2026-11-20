@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-floor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent Floor — a compact always-on dock for DeepSeek Harness: which session is running, how far along, how many tokens, which files changed.",
   "license": "MIT",
   "type": "module",

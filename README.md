@@ -9,11 +9,12 @@ DSH 自带的「任务管理」页已经能看到 agent 树和后台任务，但
 - **收起**：`● 2 在跑 / 5 在岗`（有会话在跑时圆点呼吸）
 - **点开**：每个会话一行 —— 状态点、名字（组长带 `带队 N`）、`第N步·第T轮 · 12.3k tok`、正在跑的 `bash · pnpm run build` 或 `改 client.js · index.js`
 - 点任意一行 → 跳到那个会话
+- **按住标题栏拖动**可以把监控条挪到任意位置（位置存在 localStorage，自动记住）
 
 ## 装
 
 ```bash
-dsh plugin install dsh-agent-floor          # npm，0.2.0+
+dsh plugin install dsh-agent-floor          # npm，0.3.0+
 ```
 
 或加市场索引源：`https://raw.githubusercontent.com/ITxuezhe/dsh-agent-floor/main/market/index.json`
@@ -28,6 +29,7 @@ Host 半监听会话事件折叠成快照，并按会话 cwd 跑 `git status --p
 - 状态：`running` 或 45 秒内有动静 → RUNNING；5 分钟内 → STANDBY；否则 IDLE
 - 子代理靠 `parentSession` 归到组长名下，空闲超过 10 分钟自动淡出
 - 展开/收起状态存在 localStorage `dsh.agent-floor.open`
+- 位置存在 localStorage `dsh.agent-floor.pos`（相对左下角，`{x,y}`）
 
 ## 自检
 
