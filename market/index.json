@@ -16,8 +16,8 @@
         "zh": "Agent Floor · 工位视图"
       },
       "description": {
-        "en": "Watch every session and subagent as pixel engineers sitting in an isometric floor. Zoom, pan, click a nameplate to jump to that session. Theme-aware, read-only, no config.",
-        "zh": "把每个会话与子代理变成坐在等距工位房间里的像素工程师：可缩放、可拖动、点名牌跳会话。跟随深浅色皮肤，只读，免配置。"
+        "en": "A compact always-on dock for DeepSeek Harness: which session is running, how far along, how many tokens, which files changed. Click a row to jump to that session.",
+        "zh": "DeepSeek Harness 的常驻监控条：谁在跑、跑到第几步、烧了多少 token、改了哪些文件。点一行直接跳会话。"
       },
       "icon": "../icon.svg",
       "author": "ITxuezhe",
@@ -35,8 +35,8 @@
       },
       "versions": [
         {
-          "version": "0.1.0",
-          "publishTimestamp": 1795080318,
+          "version": "0.2.0",
+          "publishTimestamp": 1795139738,
           "source": {
             "type": "npm"
           },
