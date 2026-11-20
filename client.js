@@ -8,35 +8,36 @@ window.__ModuleLoader__.load({
     const inject = ['slots'];
     const ROUTE = '/dsh-agent-floor/state';
     const OPEN_KEY = 'dsh.agent-floor.open';
-    const POS_KEY = 'dsh.agent-floor.pos';
     const CHILD_TTL = 10 * 60 * 1000;
     const MAX_ROWS = 8;
 
     const CSS = `
-.fg-root{position:fixed;inset:0;z-index:60;pointer-events:none;
-  font:12px/1.5 ui-sans-serif,-apple-system,"SF Pro Text","PingFang SC",system-ui,sans-serif;
+.fg-root{font:11.5px/1.45 ui-sans-serif,-apple-system,"SF Pro Text","PingFang SC",system-ui,sans-serif;
   color:var(--dsw-alias-label-primary,#1c1c1e);}
-.fg-dock{position:absolute;min-width:196px;max-width:340px;border-radius:12px;overflow:hidden;
-  pointer-events:auto;
-  background:var(--dsw-alias-bg-overlay,#fff);
-  border:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.09));
-  box-shadow:0 8px 28px rgba(0,0,0,.12);}
-.fg-head{display:flex;align-items:center;gap:7px;padding:7px 10px;cursor:grab;
-  user-select:none;-webkit-user-select:none;touch-action:none;}
-.fg-head.dragging{cursor:grabbing;}
-.fg-head:hover{background:var(--dsw-alias-bg-layer-2,rgba(0,0,0,.03));}
+.fg-chip{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;
+  border:0;border-radius:8px;background:transparent;cursor:pointer;
+  font:inherit;color:inherit;text-align:left;}
+.fg-chip:hover{background:var(--dsw-alias-bg-layer-2,rgba(0,0,0,.04));}
 .fg-pulse{width:7px;height:7px;border-radius:50%;flex:0 0 auto;
   background:var(--dsw-alias-state-idle-primary,#9aa0a6);}
 .fg-pulse.on{background:var(--dsw-alias-state-success-primary,#1a9b4e);
   animation:fg-breathe 1.6s ease-in-out infinite;}
 @keyframes fg-breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
-.fg-sum{font-weight:600;letter-spacing:.1px;white-space:nowrap;}
+.fg-sum{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fg-sum i{font-style:normal;font-weight:500;opacity:.55;}
-.fg-caret{margin-left:auto;opacity:.45;font-size:11px;}
-.fg-body{max-height:280px;overflow:auto;
-  border-top:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.07));}
+.fg-panel{position:fixed;left:12px;bottom:64px;z-index:61;width:290px;max-height:min(420px,60vh);
+  overflow:auto;border-radius:12px;padding:4px;
+  background:var(--dsw-alias-bg-overlay,#fff);
+  border:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.09));
+  box-shadow:0 10px 30px rgba(0,0,0,.14);
+  font:12px/1.5 ui-sans-serif,-apple-system,"SF Pro Text","PingFang SC",system-ui,sans-serif;
+  color:var(--dsw-alias-label-primary,#1c1c1e);}
+.fg-panel-head{display:flex;align-items:center;gap:7px;padding:6px 8px 7px;font-weight:600;
+  border-bottom:1px solid var(--dsw-alias-border-l1,rgba(0,0,0,.07));margin-bottom:4px;}
+.fg-panel-head span.close{margin-left:auto;cursor:pointer;opacity:.45;font-weight:500;padding:0 3px;}
+.fg-panel-head span.close:hover{opacity:.9;}
 .fg-row{display:grid;grid-template-columns:9px 1fr auto;gap:2px 7px;
-  padding:6px 10px;cursor:pointer;align-items:center;}
+  padding:6px 8px;cursor:pointer;align-items:center;border-radius:8px;}
 .fg-row:hover{background:var(--dsw-alias-bg-layer-2,rgba(0,0,0,.035));}
 .fg-dot{width:7px;height:7px;border-radius:50%;
   background:var(--dsw-alias-state-idle-primary,#c2c6cc);}
@@ -47,7 +48,7 @@ window.__ModuleLoader__.load({
 .fg-num{font-variant-numeric:tabular-nums;opacity:.6;white-space:nowrap;font-size:11px;}
 .fg-file{grid-column:2 / 4;font-size:11px;opacity:.5;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;}
-.fg-more{grid-column:1 / 4;padding:5px 10px;font-size:11px;opacity:.5;}
+.fg-more{grid-column:1 / 4;padding:5px 8px;font-size:11px;opacity:.5;}
 `;
 
     function ensureStyle() {
@@ -66,31 +67,47 @@ window.__ModuleLoader__.load({
       return (n / 1e6).toFixed(1) + 'M';
     }
 
-    function ago(t) {
-      if (!t) return '';
-      const s = Math.max(0, Math.round((Date.now() - t) / 1000));
-      if (s < 60) return s + '秒前';
-      if (s < 3600) return Math.round(s / 60) + '分钟前';
-      return Math.round(s / 3600) + '小时前';
+    // One shared poller for every mount point, so the chip and the panel never
+    // fetch twice and always show the same snapshot.
+    const store = { open: false, data: null, subs: new Set(), timer: null, started: false };
+
+    function readOpen() {
+      try { return localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
     }
 
-    function useFloor(open, initial) {
-      const [data, setData] = useState(() => initial || null);
+    function setOpen(next) {
+      store.open = next;
+      try { localStorage.setItem(OPEN_KEY, next ? '1' : '0'); } catch {}
+      notify();
+    }
+
+    function notify() {
+      store.subs.forEach((fn) => { try { fn(); } catch {} });
+    }
+
+    function startPolling() {
+      if (store.started) return;
+      store.started = true;
+      const tick = () => {
+        Promise.resolve()
+          .then(() => fetch(ROUTE, { headers: { accept: 'application/json' } }))
+          .then((r) => (r && r.ok ? r.json() : null))
+          .then((d) => { if (d) { store.data = d; notify(); } })
+          .catch(() => {})
+          .then(() => { store.timer = setTimeout(tick, store.open ? 2000 : 6000); });
+      };
+      tick();
+    }
+
+    function useStore() {
+      const [, bump] = useState(0);
       useEffect(() => {
-        let alive = true;
-        let timer = null;
-        const tick = () => {
-          Promise.resolve()
-            .then(() => fetch(ROUTE, { headers: { accept: 'application/json' } }))
-            .then((r) => (r && r.ok ? r.json() : null))
-            .then((d) => { if (alive && d) setData(d); })
-            .catch(() => {})
-            .then(() => { if (alive) timer = setTimeout(tick, open ? 2000 : 6000); });
-        };
-        tick();
-        return () => { alive = false; if (timer) clearTimeout(timer); };
-      }, [open]);
-      return data;
+        const fn = () => bump((v) => v + 1);
+        store.subs.add(fn);
+        startPolling();
+        return () => { store.subs.delete(fn); };
+      }, []);
+      return store;
     }
 
     function deriveAgents(data) {
@@ -153,6 +170,17 @@ window.__ModuleLoader__.load({
       return '';
     }
 
+    function openSession(ctx, a) {
+      const id = a && a.id;
+      if (!id) return;
+      try {
+        const ui = ctx && typeof ctx.get === 'function' ? ctx.get('uiWorkspace') : null;
+        if (ui && typeof ui.openSession === 'function') { ui.openSession(id); return; }
+        const ses = ctx && typeof ctx.get === 'function' ? ctx.get('sessions') : null;
+        if (ses && typeof ses.scope === 'function') ses.scope(id);
+      } catch {}
+    }
+
     function MonitorRow(props) {
       const a = props.agent;
       const cls = 'fg-dot ' + (a.status === 'RUNNING' ? 'run' : a.status === 'STANDBY' ? 'wait' : '');
@@ -170,120 +198,69 @@ window.__ModuleLoader__.load({
       ]);
     }
 
-    function readPos() {
-      try {
-        const raw = localStorage.getItem(POS_KEY);
-        if (raw) {
-          const v = JSON.parse(raw);
-          if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) return { x: v.x, y: v.y };
-        }
-      } catch {}
-      return { x: 14, y: 14 };
+    /** Sidebar-foot chip: always visible, one line, no overlay over the page. */
+    function FloorChip(props) {
+      const ctx = (props && props.ctx) || null;
+      const s = useStore();
+      const agents = deriveAgents(s.data);
+      const running = agents.filter((a) => a.status === 'RUNNING').length;
+      useEffect(() => { ensureStyle(); }, []);
+      const label = agents.length === 0
+        ? '暂无会话'
+        : (running ? running + ' 在跑' : '全部空闲') + ' / ' + agents.length + ' 在岗';
+      return h('div', { className: 'fg-root' },
+        h('button', {
+          className: 'fg-chip',
+          type: 'button',
+          title: running ? running + ' 个会话正在跑，点开看详情' : '点开看会话详情',
+          onClick: () => setOpen(!s.open),
+        }, [
+          h('span', { className: 'fg-pulse' + (running ? ' on' : ''), key: 'p' }),
+          h('span', { className: 'fg-sum', key: 's' }, label),
+        ]));
     }
 
-    function MonitorBar(props) {
+    /** Frame-wide panel, only mounted while open; anchored above the chip. */
+    function FloorPanel(props) {
       const ctx = (props && props.ctx) || null;
-      const [open, setOpen] = useState(() => {
-        try { return localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
-      });
-      const [pos, setPos] = useState(readPos);
-      const [dragging, setDragging] = useState(false);
-      const dragRef = useRef(null);
-      const movedRef = useRef(false);
-      const data = useFloor(open, props && props.initialData);
-      const agents = deriveAgents(data);
+      const s = useStore();
+      const agents = deriveAgents(s.data);
       const running = agents.filter((a) => a.status === 'RUNNING').length;
       const shown = agents.slice(0, MAX_ROWS);
       const hidden = agents.length - shown.length;
-
-      const toggle = () => {
-        const next = !open;
-        setOpen(next);
-        try { localStorage.setItem(OPEN_KEY, next ? '1' : '0'); } catch {}
-      };
+      const ref = useRef(null);
 
       useEffect(() => { ensureStyle(); }, []);
 
       useEffect(() => {
-        if (!dragging) return undefined;
-        const move = (e) => {
-          const d = dragRef.current;
-          if (!d) return;
-          const dx = e.clientX - d.x0;
-          const dy = e.clientY - d.y0;
-          if (Math.abs(dx) + Math.abs(dy) > 3) movedRef.current = true;
-          const maxX = Math.max(8, (window.innerWidth || 1200) - 120);
-          const maxY = Math.max(8, (window.innerHeight || 800) - 60);
-          setPos({
-            x: Math.min(maxX, Math.max(8, d.px + dx)),
-            y: Math.min(maxY, Math.max(8, d.py - dy)),
-          });
+        if (!s.open) return undefined;
+        const onDown = (e) => {
+          const el = ref.current;
+          if (el && e && e.target && el.contains && el.contains(e.target)) return;
+          setOpen(false);
         };
-        const up = () => {
-          setDragging(false);
-          const p = readPos();
-          try { localStorage.setItem(POS_KEY, JSON.stringify(snapRef.current || p)); } catch {}
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', up);
+        const onKey = (e) => { if (e && e.key === 'Escape') setOpen(false); };
+        document.addEventListener('pointerdown', onDown, true);
+        document.addEventListener('keydown', onKey);
         return () => {
-          window.removeEventListener('pointermove', move);
-          window.removeEventListener('pointerup', up);
-          window.removeEventListener('pointercancel', up);
+          document.removeEventListener('pointerdown', onDown, true);
+          document.removeEventListener('keydown', onKey);
         };
-      }, [dragging]);
+      }, [s.open]);
 
-      const snapRef = useRef(pos);
-      snapRef.current = pos;
+      if (!s.open) return null;
 
-      const onHeadDown = (e) => {
-        if (e.button !== undefined && e.button !== 0) return;
-        dragRef.current = { x0: e.clientX, y0: e.clientY, px: pos.x, py: pos.y };
-        movedRef.current = false;
-        setDragging(true);
-      };
-
-      const onHeadClick = () => {
-        if (movedRef.current) { movedRef.current = false; return; }
-        toggle();
-      };
-
-      const openSession = (a) => {
-        const id = a && a.id;
-        if (!id) return;
-        try {
-          const ui = ctx && typeof ctx.get === 'function' ? ctx.get('uiWorkspace') : null;
-          if (ui && typeof ui.openSession === 'function') { ui.openSession(id); return; }
-          const ses = ctx && typeof ctx.get === 'function' ? ctx.get('sessions') : null;
-          if (ses && typeof ses.scope === 'function') ses.scope(id);
-        } catch {}
-      };
-
-      return h('div', { className: 'fg-root' }, h('div', {
-        className: 'fg-dock',
-        style: { left: pos.x + 'px', bottom: pos.y + 'px' },
-      }, [
-        h('div', {
-          className: 'fg-head' + (dragging ? ' dragging' : ''),
-          key: 'head',
-          onPointerDown: onHeadDown,
-          onClick: onHeadClick,
-          title: '拖动可移动位置 · 点击' + (open ? '收起' : '展开'),
-        }, [
+      return h('div', { className: 'fg-panel', ref }, [
+        h('div', { className: 'fg-panel-head', key: 'head' }, [
           h('span', { className: 'fg-pulse' + (running ? ' on' : ''), key: 'p' }),
-          h('span', { className: 'fg-sum', key: 's' }, [
-            running ? running + ' 在跑' : '全部空闲',
-            h('i', { key: 'i' }, '  / ' + agents.length + ' 在岗'),
-          ]),
-          h('span', { className: 'fg-caret', key: 'c' }, open ? '⌄' : '⌃'),
+          h('span', { key: 't' }, running ? running + ' 个在跑' : '全部空闲'),
+          h('span', { key: 'n', style: { opacity: .5, fontWeight: 500 } }, '共 ' + agents.length + ' 个会话'),
+          h('span', { className: 'close', key: 'x', onClick: () => setOpen(false), title: '关闭' }, '✕'),
         ]),
-        open ? h('div', { className: 'fg-body', key: 'body' }, [
-          ...shown.map((a) => h(MonitorRow, { key: a.id || a.name, agent: a, onOpen: openSession })),
-          hidden > 0 ? h('div', { className: 'fg-more', key: 'more' }, '还有 ' + hidden + ' 个会话') : null,
-          agents.length === 0 ? h('div', { className: 'fg-more', key: 'empty' }, '暂无会话') : null,
-        ]) : null,
-      ]));
+        ...shown.map((a) => h(MonitorRow, { key: a.id || a.name, agent: a, onOpen: (x) => openSession(ctx, x) })),
+        hidden > 0 ? h('div', { className: 'fg-more', key: 'more' }, '还有 ' + hidden + ' 个会话') : null,
+        agents.length === 0 ? h('div', { className: 'fg-more', key: 'empty' }, '暂无会话') : null,
+      ]);
     }
 
     function apply(ctx) {
@@ -291,24 +268,27 @@ window.__ModuleLoader__.load({
         const target = ready && ready.slots ? ready : ctx;
         const slots = target && target.slots;
         if (!slots) return;
+        const register = (name, id, order, label, Comp) => {
+          slots.inject(name, () => slots.register({ name, id, order, label }, (props) => h(Comp, { ...props, ctx })));
+        };
         const render = () => {
-          slots.inject('shell.overlay', () => slots.register({
-            name: 'shell.overlay',
-            id: 'dsh-agent-floor',
-            order: 940,
-            label: 'Agent Floor',
-          }, () => h(MonitorBar, { ctx })));
+          store.open = readOpen();
+          // Chip lives in the sidebar foot next to Settings — out of the content area.
+          register('sidebar.footer.action', 'dsh-agent-floor', 10, 'Agent Floor', FloorChip);
+          // Panel is frame-wide so the sidebar can never clip it.
+          register('shell.overlay', 'dsh-agent-floor.panel', 940, 'Agent Floor', FloorPanel);
         };
         if (typeof target.effect === 'function') target.effect(render, 'dsh-agent-floor: mounts');
         else render();
       };
-      if (typeof ctx.inject === 'function') {
-        ctx.inject(['slots'], bridge);
-        return;
-      }
-      if (ctx.slots) bridge(ctx);
+      if (ctx && typeof ctx.inject === 'function') ctx.inject(['slots'], bridge);
+      else bridge(ctx);
     }
 
-    return { inject, apply, __dshTest: { deriveAgents, MonitorBar, MonitorRow } };
+    return {
+      inject,
+      apply,
+      __dshTest: { deriveAgents, FloorChip, FloorPanel, MonitorRow, store },
+    };
   },
 });

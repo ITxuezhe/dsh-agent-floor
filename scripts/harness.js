@@ -153,7 +153,7 @@ function main() {
       throw new Error('client.js: 既没有 __dshTest，也找不到 `return { inject, apply };` —— 导出结构变了？');
     }
     src = src.replace(EXPORT_RE,
-      'return { inject, apply, __dshTest: { deriveAgents: deriveAgents, MonitorBar: MonitorBar } };');
+      'return { inject, apply, __dshTest: { deriveAgents: deriveAgents, FloorChip: FloorChip, FloorPanel: FloorPanel, MonitorRow: MonitorRow, store: store } };');
   }
 
   const factoryFn = new Function(
@@ -187,23 +187,31 @@ function main() {
   if (typeof mod.apply !== 'function') throw new Error('模块没有导出 apply()');
   mod.apply(ctx);
   if (!registered.length) throw new Error('apply() 没有注册任何组件到 shell.overlay');
-  const entry = registered[registered.length - 1];
-  if (typeof entry.render !== 'function') throw new Error('slots.register 的 render 不是函数');
-
-  // 2) 真的把注册出来的组件渲染一次。
-  const tree = renderNode(React.createElement(entry.render, {}));
-  if (!tree.length) throw new Error('FloorDock 渲染结果为空');
-  const rootTag = tree[0].tag;
-  if (typeof rootTag !== 'string') throw new Error('FloorDock 顶层不是 DOM 标签: ' + String(rootTag));
-  if (!tree[0].props.className || String(tree[0].props.className).indexOf('fg-') !== 0) {
-    throw new Error('FloorDock 顶层缺少 fg-* className: ' + JSON.stringify(tree[0].props.className));
+  const bySlot = (name) => registered.find((r) => r.spec && r.spec.name === name);
+  const chip = bySlot('sidebar.footer.action');
+  const panel = bySlot('shell.overlay');
+  if (!chip) throw new Error('apply() 没有把 chip 注册到 sidebar.footer.action');
+  if (!panel) throw new Error('apply() 没有把 panel 注册到 shell.overlay');
+  if (typeof chip.render !== 'function' || typeof panel.render !== 'function') {
+    throw new Error('slots.register 的 render 不是函数');
   }
-  const dockNodes = countNodes(tree);
 
-  // 3) 用 5 个假 agent 渲染 IsoFloor（满屏场景），确保场景层也能画出来。
+  // 2) 真的把注册出来的 chip 渲染一次。
+  const tree = renderNode(React.createElement(chip.render, {}));
+  if (!tree.length) throw new Error('FloorChip 渲染结果为空');
+  const rootTag = tree[0].tag;
+  if (typeof rootTag !== 'string') throw new Error('FloorChip 顶层不是 DOM 标签: ' + String(rootTag));
+  if (!tree[0].props.className || String(tree[0].props.className).indexOf('fg-') !== 0) {
+    throw new Error('FloorChip 顶层缺少 fg-* className: ' + JSON.stringify(tree[0].props.className));
+  }
+  const chipNodes = countNodes(tree);
+  const chipButton = findTag(tree, 'button');
+  if (!chipButton) throw new Error('FloorChip 没有渲染出 button（点不了）');
+
+  // 3) 用 5 个假 agent 验证分组，再渲染面板。
   const test = mod.__dshTest;
-  if (!test || typeof test.MonitorBar !== 'function' || typeof test.deriveAgents !== 'function') {
-    throw new Error('client.js 没有暴露 __dshTest.MonitorBar / deriveAgents');
+  if (!test || typeof test.FloorPanel !== 'function' || typeof test.deriveAgents !== 'function') {
+    throw new Error('client.js 没有暴露 __dshTest.FloorPanel / deriveAgents');
   }
   const now = Date.now();
   const sessions = [
@@ -217,34 +225,37 @@ function main() {
   if (ordered.length !== 5) throw new Error('deriveAgents 期望 5 个 agent，实际 ' + ordered.length);
   if (ordered.filter((o) => o.depth === 1).length !== 1) throw new Error('deriveAgents 没把子代理排成 depth 1');
 
-  const bar = renderNode(React.createElement(test.MonitorBar, { ctx: ctx }));
-  if (!bar.length || bar[0].tag !== 'div') throw new Error('MonitorBar 顶层不是 div');
-  const barNodes = countNodes(bar);
-  const expanded = renderNode(React.createElement(test.MonitorBar, { ctx: ctx, initialData: { sessions } }));
+  test.store.open = true;
+  test.store.data = { sessions };
+  const chipOn = renderNode(React.createElement(chip.render, {}));
+  const panelTree = renderNode(React.createElement(panel.render, {}));
+  if (!panelTree.length) throw new Error('FloorPanel 打开状态下渲染结果为空');
   let rowCount = 0;
-  (function walk3(n) {
+  (function walk(n) {
     if (!n || typeof n !== 'object') return;
     const cls = n.props && n.props.className;
     if (typeof cls === 'string' && cls.indexOf('fg-row') === 0) rowCount++;
-    for (const c of n.children || []) walk3(c);
-  })(expanded[0]);
+    for (const c of n.children || []) walk(c);
+  })(panelTree[0]);
   if (rowCount !== 5) throw new Error('展开状态应渲染 5 行，实际 ' + rowCount);
 
   const row = renderNode(React.createElement(test.MonitorRow, { agent: ordered[0], onOpen: () => {} }));
   if (!row.length || row[0].tag !== 'div') throw new Error('MonitorRow 顶层不是 div');
   if (String(row[0].props.className).indexOf('fg-row') !== 0) throw new Error('MonitorRow 缺少 fg-row className');
 
-  // 4) 跑一次 effect（useFloor 会发起一次假 fetch），确认轮询逻辑不炸。
+  // 4) 跑一次 effect（轮询会发起一次假 fetch），确认不炸。
   for (const fn of effects) {
     const cleanup = fn();
     if (typeof cleanup === 'function') cleanup();
   }
 
   console.log('  client : ' + target);
-  console.log('  dock   : <' + rootTag + ' class="' + tree[0].props.className + '"> (' + dockNodes + ' nodes)');
-  console.log('  bar    : <div fg-root> (' + barNodes + ' nodes, ' + ordered.length + ' agents)');
+  console.log('  chip   : <' + rootTag + ' class="' + tree[0].props.className + '"> (' + chipNodes + ' nodes)');
+  console.log('  panel  : <div fg-panel> (' + countNodes(panelTree) + ' nodes, ' + ordered.length + ' agents, chip ' + countNodes(chipOn) + ' nodes)');
   console.log('  effects: ' + effects.length + ' 个已执行');
   console.log('render ok');
+  // 共享轮询器会挂一个真实 setTimeout，自检到这里就该退出。
+  process.exit(0);
 }
 
 try {

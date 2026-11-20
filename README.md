@@ -1,20 +1,20 @@
 # Agent Floor · 常驻监控条
 
-给 DeepSeek Harness 左下角挂一条**常驻监控条**：不用开标签页，随时能瞄一眼哪个会话在跑、跑到第几步、烧了多少 token、改了哪些文件。
+在 DeepSeek Harness **左侧边栏底部（Settings 旁边）**挂一行常驻状态：不用开标签页、也不覆盖正文，随时能瞄一眼哪个会话在跑、跑到第几步、烧了多少 token、改了哪些文件。
 
 DSH 自带的「任务管理」页已经能看到 agent 树和后台任务，但它是**按会话打开的标签页**，而且没有步/轮/token/改动文件这些指标。这个插件只补这块，不重复画树。
 
 ## 长什么样
 
-- **收起**：`● 2 在跑 / 5 在岗`（有会话在跑时圆点呼吸）
-- **点开**：每个会话一行 —— 状态点、名字（组长带 `带队 N`）、`第N步·第T轮 · 12.3k tok`、正在跑的 `bash · pnpm run build` 或 `改 client.js · index.js`
+- **侧边栏底部**：`● 2 在跑 / 5 在岗` 一行常驻（有会话在跑时圆点呼吸），不挡正文
+- **点一下**：在它上方弹出面板 —— 每个会话一行
+- 面板每行：状态点、名字（组长带 `带队 N`）、`第N步·第T轮 · 12.3k tok`、正在跑的 `bash · pnpm run build` 或 `改 client.js · index.js`
 - 点任意一行 → 跳到那个会话
-- **按住标题栏拖动**可以把监控条挪到任意位置（位置存在 localStorage，自动记住）
 
 ## 装
 
 ```bash
-dsh plugin install dsh-agent-floor          # npm，0.3.0+
+dsh plugin install dsh-agent-floor          # npm，0.4.0+
 ```
 
 或加市场索引源：`https://raw.githubusercontent.com/ITxuezhe/dsh-agent-floor/main/market/index.json`
@@ -23,13 +23,13 @@ dsh plugin install dsh-agent-floor          # npm，0.3.0+
 
 ## 数据从哪来
 
-插件挂官方插槽 `shell.overlay`，客户端每 2 秒（收起时 6 秒）拉一次只读路由 `GET /dsh-agent-floor/state`。
+插件挂两个官方插槽：`sidebar.footer.action`（侧边栏底部那一行）与 `shell.overlay`（弹出面板，避免被侧边栏裁剪）。客户端每 2 秒（收起时 6 秒）拉一次只读路由 `GET /dsh-agent-floor/state`。
 Host 半监听会话事件折叠成快照，并按会话 cwd 跑 `git status --porcelain`（10 秒缓存、失败降级为空）拿真实改动文件。
 
 - 状态：`running` 或 45 秒内有动静 → RUNNING；5 分钟内 → STANDBY；否则 IDLE
 - 子代理靠 `parentSession` 归到组长名下，空闲超过 10 分钟自动淡出
 - 展开/收起状态存在 localStorage `dsh.agent-floor.open`
-- 位置存在 localStorage `dsh.agent-floor.pos`（相对左下角，`{x,y}`）
+- 面板点空白处或 Esc 关闭
 
 ## 自检
 

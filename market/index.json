@@ -16,8 +16,8 @@
         "zh": "Agent Floor · 工位视图"
       },
       "description": {
-        "en": "A compact always-on dock for DeepSeek Harness: which session is running, how far along, how many tokens, which files changed. Click a row to jump to that session.",
-        "zh": "DeepSeek Harness 的常驻监控条：谁在跑、跑到第几步、烧了多少 token、改了哪些文件。点一行直接跳会话。"
+        "en": "A one-line agent status row in the DeepSeek Harness sidebar foot: who is running, which step, tokens burned, files touched. Click for the full list — it never covers the chat.",
+        "zh": "挂在 DeepSeek Harness 侧边栏底部的一行智能体状态：谁在跑、第几步、烧了多少 token、改了哪些文件。点开看完整列表，不挡正文。"
       },
       "icon": "../icon.svg",
       "author": "ITxuezhe",
@@ -35,8 +35,8 @@
       },
       "versions": [
         {
-          "version": "0.3.0",
-          "publishTimestamp": 1795140494,
+          "version": "0.4.0",
+          "publishTimestamp": 1795141244,
           "source": {
             "type": "npm"
           },
