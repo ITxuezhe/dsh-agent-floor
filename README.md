@@ -14,7 +14,7 @@ DSH 自带的「任务管理」页已经能看到 agent 树和后台任务，但
 ## 装
 
 ```bash
-dsh plugin install dsh-agent-floor          # npm，0.4.0+
+dsh plugin install dsh-agent-floor          # npm，0.4.1+
 ```
 
 或加市场索引源：`https://raw.githubusercontent.com/ITxuezhe/dsh-agent-floor/main/market/index.json`

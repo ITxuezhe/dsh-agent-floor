@@ -23,6 +23,8 @@ window.__ModuleLoader__.load({
 .fg-pulse.on{background:var(--dsw-alias-state-success-primary,#1a9b4e);
   animation:fg-breathe 1.6s ease-in-out infinite;}
 @keyframes fg-breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+.fg-chip.rail{justify-content:center;padding:5px 4px;gap:4px;}
+.fg-rail-num{font-weight:600;font-variant-numeric:tabular-nums;font-size:11px;}
 .fg-sum{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fg-sum i{font-style:normal;font-weight:500;opacity:.55;}
 .fg-panel{position:fixed;left:12px;bottom:64px;z-index:61;width:290px;max-height:min(420px,60vh);
@@ -205,18 +207,20 @@ window.__ModuleLoader__.load({
       const agents = deriveAgents(s.data);
       const running = agents.filter((a) => a.status === 'RUNNING').length;
       useEffect(() => { ensureStyle(); }, []);
+      const rail = props && props.wide === false;
       const label = agents.length === 0
         ? '暂无会话'
         : (running ? running + ' 在跑' : '全部空闲') + ' / ' + agents.length + ' 在岗';
       return h('div', { className: 'fg-root' },
         h('button', {
-          className: 'fg-chip',
+          className: 'fg-chip' + (rail ? ' rail' : ''),
           type: 'button',
-          title: running ? running + ' 个会话正在跑，点开看详情' : '点开看会话详情',
+          title: label + ' · 点开看详情',
           onClick: () => setOpen(!s.open),
         }, [
           h('span', { className: 'fg-pulse' + (running ? ' on' : ''), key: 'p' }),
-          h('span', { className: 'fg-sum', key: 's' }, label),
+          rail ? (running ? h('span', { className: 'fg-rail-num', key: 'n' }, String(running)) : null)
+            : h('span', { className: 'fg-sum', key: 's' }, label),
         ]));
     }
 
